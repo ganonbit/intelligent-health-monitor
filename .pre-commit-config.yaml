@@ -1,4 +1,12 @@
 repos:
+  - repo: https://github.com/astral-sh/uv-pre-commit
+    rev: 0.8.14
+    hooks:
+      - id: uv-sync
+        args: ["--locked", "--all-packages"]
+      - id: uv-lock
+      - id: uv-export
+
   - repo: https://github.com/astral-sh/ruff-pre-commit
     rev: v0.12.11
     hooks:
@@ -10,4 +18,5 @@ repos:
     rev: v1.17.1
     hooks:
       - id: mypy
-        language: system
+        language: python
+        additional_dependencies: [pydantic>=2.11.7]

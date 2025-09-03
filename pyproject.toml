@@ -60,6 +60,12 @@ check_untyped_defs = true
 disallow_untyped_decorators = true
 no_implicit_optional = true
 
+[tool.mypy.overrides]
+module = ["tests.*"]
+check_untyped_defs = true
+disallow_untyped_defs = false
+disallow_incomplete_defs = false
+disallow_untyped_decorators = false
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
