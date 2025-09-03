@@ -270,6 +270,7 @@ class MetricsCollector:
 
         start_time = time.perf_counter()
         collected_metrics: list[SystemMetric] = []
+        failed_sources = 0
 
         # Structured concurrency - all tasks managed together
         async with asyncio.TaskGroup() as task_group:
@@ -285,14 +286,13 @@ class MetricsCollector:
             ]
 
         # Process results (TaskGroup ensures all tasks completed or cancelled)
-        successful_collections = 0
         for task in tasks:
             try:
                 result = task.result()
                 if result.is_ok():
                     collected_metrics.extend(result.unwrap())
-                    successful_collections += 1
                 else:
+                    failed_sources += 1
                     # Log error but continue processing other sources
                     self.logger.warning(
                         "source_collection_failed",
@@ -300,25 +300,26 @@ class MetricsCollector:
                         source=task.get_name(),
                     )
             except TimeoutError:
+                failed_sources += 1
                 self.logger.warning(
                     "source_collection_timeout",
                     source=task.get_name(),
-                )
-            except Exception as e:
-                self.logger.exception(
-                    "unexpected_source_collection_error",
-                    error=str(e),
-                    source=task.get_name(),
+                    timeout_seconds=self.config.timeout_seconds,
                 )
 
-        duration_time = time.perf_counter() - start_time
+        # If all sources failed, return an error
+        if failed_sources > 0 and len(collected_metrics) == 0:
+            return Result.err(
+                RuntimeError(f"All {failed_sources} sources failed to collect metrics")
+            )
 
+        collection_time = time.perf_counter() - start_time
         self.logger.info(
             "metrics_collection_completed",
-            total_metrics=len(collected_metrics),
-            successful_sources=successful_collections,
-            total_sources=len(self.sources),
-            duration_seconds=round(duration_time, 3),
+            metrics_collected=len(collected_metrics),
+            sources_attempted=len(self.sources),
+            sources_failed=failed_sources,
+            collection_time_seconds=collection_time,
         )
         return Result.ok(collected_metrics)
 
