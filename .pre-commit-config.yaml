@@ -10,10 +10,4 @@ repos:
     rev: v1.17.1
     hooks:
       - id: mypy
-        args:
-          # Auto-install missing stubs silently
-          - --install-types
-          - --non-interactive
-        additional_dependencies:
-          - pydantic>=2.7.0
-          - types-PyYAML
+        language: system
