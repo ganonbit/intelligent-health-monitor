@@ -50,20 +50,15 @@ select = [
 [tool.mypy]
 python_version = "3.13"
 strict = true
+mypy_path = ["core"]
 warn_return_any = true
 warn_unused_configs = true
-plugins = ["pydantic.mypy", "structlog.mypy"]
+plugins = ["pydantic.mypy"]
 disallow_untyped_defs = true
 disallow_incomplete_defs = true
 check_untyped_defs = true
 disallow_untyped_decorators = true
 no_implicit_optional = true
-
-# TODO: Remove this once mypy is fixed, odd behavior as structlog appears in:
-# mypy --verbose core/services/metrics_collector.py
-[[tool.mypy.overrides]]
-module = "structlog.*"
-ignore_missing_imports = true
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
