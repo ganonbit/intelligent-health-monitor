@@ -1,6 +1,6 @@
 version = 1
 revision = 3
-requires-python = ">=3.13.7"
+requires-python = ">=3.13"
 
 [[package]]
 name = "annotated-types"
@@ -309,11 +309,12 @@ wheels = [
 [[package]]
 name = "intelligent-health-monitor"
 version = "0.1.0"
-source = { virtual = "." }
+source = { editable = "." }
 dependencies = [
     { name = "fastapi" },
     { name = "httpx" },
     { name = "hypothesis" },
+    { name = "pydantic" },
     { name = "pydantic-ai-slim", extra = ["anthropic", "evals", "logfire", "openai"] },
     { name = "pytest" },
     { name = "pytest-asyncio" },
@@ -335,6 +336,7 @@ requires-dist = [
     { name = "fastapi", specifier = ">=0.116.1" },
     { name = "httpx", specifier = ">=0.28.1" },
     { name = "hypothesis", specifier = ">=6.138.14" },
+    { name = "pydantic", specifier = ">=2.11.7" },
     { name = "pydantic-ai-slim", extras = ["anthropic", "evals", "logfire", "openai"], specifier = ">=0.8.1" },
     { name = "pytest", specifier = ">=8.4.1" },
     { name = "pytest-asyncio", specifier = ">=1.1.0" },
