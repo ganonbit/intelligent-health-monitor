@@ -396,13 +396,15 @@ async def main() -> None:
         if collection_count >= 3:  # Stop after 3 collections for demo
             break
 
-    # add a new source
-    metrics_collector.add_source(SystemMetricsSource("new-service-prod"))
-    print("New source added:", metrics_collector.sources[-1].source_name)
+    # Add and demonstrate a new source
+    source_name = "new-service-prod"
+    new_source = SystemMetricsSource(source_name)
+    metrics_collector.add_source(new_source)
+    print(f"Added source: {source_name}")
 
-    # remove new source
-    metrics_collector.remove_source(metrics_collector.sources[-1])
-    print("New source removed:", metrics_collector.sources[-1].source_name)
+    # Remove the source we just added
+    metrics_collector.remove_source(new_source)
+    print(f"Removed source: {source_name}")
 
 
 if __name__ == "__main__":
