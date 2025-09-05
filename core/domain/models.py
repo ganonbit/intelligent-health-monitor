@@ -21,6 +21,7 @@ class MetricType(str, Enum):
     NETWORK = "network"
     ERROR_RATE = "error_rate"
     RESPONSE_TIME = "response_time"
+    CUSTOM = "custom"
 
 
 class Severity(str, Enum):
@@ -37,7 +38,8 @@ class SystemMetric(BaseModel):
 
     model_config = ConfigDict(frozen=True)  # Immutable for better reasoning
 
-    metric_type: MetricType
+    metric_type: MetricType = Field(default=MetricType.CUSTOM)
+    name: str | None = Field(default=None, description="Name of the metric")
     value: float
     unit: str
     timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))
