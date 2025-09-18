@@ -9,6 +9,7 @@ dependencies = [
     "httpx>=0.28.1",
     "pydantic>=2.11.7",
     "pydantic-ai-slim[anthropic,evals,logfire,openai]>=0.8.1",
+    "python-dotenv>=1.1.1",
     "rich>=14.1.0",
     "structlog>=25.4.0",
     "typer>=0.17.3",
