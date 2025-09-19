@@ -23,7 +23,6 @@ from typing import Any, Literal
 import structlog
 from pydantic import BaseModel, Field
 from pydantic_ai import Agent
-from pydantic_ai.models import KnownModelName
 
 from core.domain.models import AnomalyDetection, HealthReport, MetricType, Severity, SystemMetric
 
@@ -62,7 +61,8 @@ class SystemContext(BaseModel):
 class AIAnalysisConfig(BaseModel):
     """Configuration for AI analysis with smart defaults."""
 
-    model_name: KnownModelName = KnownModelName.GPT_4o_mini
+    # Use explicit string to satisfy Agent model literal type requirements
+    model_name: str = "openai:gpt-4o-mini"
     max_tokens: int = Field(default=1000, gt=100)
     temperature: float = Field(default=0.1, ge=0.0, le=1.0)  # Low for consistent analysis
     timeout_seconds: float = Field(default=30.0, gt=0.0)
@@ -93,8 +93,8 @@ class AnomalyDetectionAgent(Agent[AnomalyDetection]):
 
         # Initialize the agent with structured output
         self.agent = Agent(
-            model_name=self.config.model_name,
-            result_type=AnomalyDetection,
+            model=self.config.model_name,
+            output_type=AnomalyDetection,
             system_prompt=self._build_system_prompt(),
         )
 
@@ -150,7 +150,7 @@ Always explain your reasoning step-by-step so other engineers can understand you
             )
 
             # Validate AI response meets our confidence threshold
-            anomaly = result.data
+            anomaly = result.content
             if anomaly.confidence < self.config.anomaly_threshold:
                 self.logger.info(
                     "low_confidence_anomaly_ignored",
@@ -301,8 +301,8 @@ class RootCauseAnalysisAgent:
 
         # Initialize the agent with structured output
         self.agent = Agent(
-            model_name=config.model_name,
-            result_type=str,  # Free form analysis output
+            model=self.config.model_name,
+            output_type=str,  # Free form analysis output
             system_prompt=self._build_system_prompt(),
         )
 
@@ -348,7 +348,7 @@ Please provide detailed root cause analysis and specific recommendations."""
 
         try:
             result = await self.agent.run(prompt)
-            return result.data
+            return result.content
         except Exception as e:
             self.logger.error("root_cause_analysis_failed", error=str(e))
             return f"Root cause analysis failed: {str(e)}"
