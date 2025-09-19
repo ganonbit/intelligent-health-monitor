@@ -18,7 +18,7 @@ import asyncio
 import textwrap
 from collections import defaultdict
 from datetime import UTC, datetime, timedelta
-from typing import Any, Literal
+from typing import Any, Literal, cast
 
 import structlog
 from pydantic import BaseModel, Field
@@ -150,7 +150,7 @@ Always explain your reasoning step-by-step so other engineers can understand you
             )
 
             # Validate AI response meets our confidence threshold
-            anomaly = result.content
+            anomaly = cast(AnomalyDetection, cast(Any, result).content)
             if anomaly.confidence < self.config.anomaly_threshold:
                 self.logger.info(
                     "low_confidence_anomaly_ignored",
@@ -348,7 +348,7 @@ Please provide detailed root cause analysis and specific recommendations."""
 
         try:
             result = await self.agent.run(prompt)
-            return result.content
+            return cast(str, cast(Any, result).content)
         except Exception as e:
             self.logger.error("root_cause_analysis_failed", error=str(e))
             return f"Root cause analysis failed: {str(e)}"
