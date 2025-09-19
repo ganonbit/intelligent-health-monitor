@@ -1,11 +1,6 @@
 """
-Test suite demonstrating modern Python testing patterns.
+Test suite for metrics collection and processing.
 
-Testing philosophy:
-- Fast feedback (unit tests run in milliseconds)
-- Property-based testing for edge cases
-- Clear test names that describe behavior
-- Minimal mocking (test real behavior when possible)
 """
 
 import asyncio
