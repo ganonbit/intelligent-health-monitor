@@ -151,9 +151,6 @@ class AppConfig(BaseModel):
             raise ValueError("debug mode is only allowed in development environment")
         return self
 
-    class Config:
-        env_nested_delimiter = "__"  # Allows MONITORING__COLLECTION_INTERVAL_SECONDS
-
 
 def load_config_from_env() -> AppConfig:
     """Load configuration from environment variables with validation."""
