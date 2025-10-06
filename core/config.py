@@ -47,10 +47,19 @@ class AIProviderConfig(BaseModel):
         default=3, ge=0, description="Default max retries for AI models"
     )
 
-    @field_validator("openai_api_key", "anthropic_api_key")
-    def validate_api_keys(cls, v):
+    @field_validator("openai_api_key")
+    def validate_openai_api_key(cls, v: str):
         if not v or v == "your-openai-api-key-here":
             raise ValueError("AI provider API key must be set in environment or .env file")
+        if not v.startswith("sk-"):
+            raise ValueError("AI provider API key must start with 'sk-'")
+        return v
+
+    @field_validator("anthropic_api_key")
+    def validate_anthropic_api_key(cls, v: str | None):
+        # Optional: allow missing or empty. If provided, validate format.
+        if not v:
+            return None
         if not v.startswith("sk-"):
             raise ValueError("AI provider API key must start with 'sk-'")
         return v
@@ -180,9 +189,10 @@ def load_config_from_env() -> AppConfig:
     debug = environment == "development"
 
     # AI Provider config from environment
+    anthropic_env = os.getenv("ANTHROPIC_API_KEY")
     ai_config = AIProviderConfig(
         openai_api_key=os.getenv("OPENAI_API_KEY", ""),
-        anthropic_api_key=os.getenv("ANTHROPIC_API_KEY", ""),
+        anthropic_api_key=anthropic_env if anthropic_env else None,
         anomaly_detection_model=os.getenv("ANOMALY_DETECTION_MODEL", "openai:gpt-4o-mini"),
         root_cause_model=os.getenv("ROOT_CAUSE_MODEL", "openai:gpt-4o"),
     )
@@ -249,6 +259,15 @@ def validate_config() -> None:
     except Exception as e:
         print(f"❌ Configuration validation failed: {e}")
         raise
+
+
+def reset_config_cache() -> None:
+    """Clear the cached application configuration (useful after env var changes)."""
+    try:
+        get_config.cache_clear()  # type: ignore[attr-defined]
+    except Exception:
+        # If cache_clear is not available, ignore; next call will recompute anyway
+        pass
 
 
 def get_model_config(task: Literal["anomaly_detection", "root_cause"]) -> dict[str, Any]:

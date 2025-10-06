@@ -149,8 +149,21 @@ Always explain your reasoning step-by-step so other engineers can understand you
                 timeout=self.config.timeout_seconds,
             )
 
+            # Extract parsed output robustly across pydantic-ai versions
+            parsed: Any | None = None
+            for attr in ("data", "content", "parsed", "output"):
+                if hasattr(result, attr):
+                    parsed = getattr(result, attr)
+                    break
+            if parsed is None:
+                msg = (
+                    f"Unsupported Agent.run() result shape: {type(result)} "
+                    "has no data/content/parsed/output"
+                )
+                raise AttributeError(msg)
+
             # Validate AI response meets our confidence threshold
-            anomaly = cast(AnomalyDetection, cast(Any, result).content)
+            anomaly = cast(AnomalyDetection, cast(Any, parsed))
             if anomaly.confidence < self.config.anomaly_threshold:
                 self.logger.info(
                     "low_confidence_anomaly_ignored",
@@ -348,7 +361,18 @@ Please provide detailed root cause analysis and specific recommendations."""
 
         try:
             result = await self.agent.run(prompt)
-            return cast(str, cast(Any, result).content)
+            parsed: Any | None = None
+            for attr in ("data", "content", "parsed", "output"):
+                if hasattr(result, attr):
+                    parsed = getattr(result, attr)
+                    break
+            if parsed is None:
+                msg = (
+                    f"Unsupported Agent.run() result shape: {type(result)} "
+                    "has no data/content/parsed/output"
+                )
+                raise AttributeError(msg)
+            return cast(str, cast(Any, parsed))
         except Exception as e:
             self.logger.error("root_cause_analysis_failed", error=str(e))
             return f"Root cause analysis failed: {str(e)}"

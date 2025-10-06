@@ -270,6 +270,7 @@ class IntegratedMonitoringService:
         self.logger.info("monitoring_cycle_starting")
 
         try:
+            had_errors = False
             # Step 1: Collect metrics from all sources
             async with self.metrics_collector.collection_session():
                 metrics_result = await self.metrics_collector.collect_once()
@@ -309,8 +310,10 @@ class IntegratedMonitoringService:
                     except Exception as e:
                         self.logger.error("ai_analysis_failed", error=str(e), system=system_name)
                         self.ai_circuit_breaker.record_failure()
+                        had_errors = True
                 else:
                     self.logger.warning("ai_analysis_circuit_open", system=system_name)
+                    had_errors = True
 
                 # Fallback: Create basic health report if AI failed
                 if not health_report:
@@ -344,10 +347,19 @@ class IntegratedMonitoringService:
                 alerts_generated=len(all_alerts),
                 duration_seconds=round(cycle_duration, 3),
                 ai_circuit_state=self.ai_circuit_breaker.state,
+                degraded=had_errors,
             )
 
-            # Return combined health report
-            return self._combine_health_reports(health_reports)
+            # Return combined health report, downgrading to warning if degraded
+            combined = self._combine_health_reports(health_reports)
+            if had_errors and combined.overall_status == "healthy":
+                combined = HealthReport(
+                    overall_status="warning",
+                    metrics=combined.metrics,
+                    anomalies=combined.anomalies,
+                    analysis_duration_seconds=combined.analysis_duration_seconds,
+                )
+            return combined
 
         except Exception as e:
             self.logger.error("monitoring_cycle_failed", error=str(e))
