@@ -1,22 +1,106 @@
 repos:
-  - repo: https://github.com/astral-sh/uv-pre-commit
-    rev: 0.8.14
+  # 1. First, clean up code with autoflake
+  - repo: https://github.com/PyCQA/autoflake
+    rev: v2.3.1
     hooks:
-      - id: uv-sync
-        args: ["--locked", "--all-packages"]
-      - id: uv-lock
-      - id: uv-export
+      - id: autoflake
+        name: autoflake
+        description: "Removes unused imports and variables"
+        types: [python]
+        args:
+          - "--in-place"
+          - "--remove-all-unused-imports"
+          - "--remove-unused-variables"
+          - "--expand-star-imports"
+          - "--exclude=__init__.py"
+        exclude: '/(\.git|\.venv|venv|__pycache__|migrations|node_modules|build|dist)/'
+        verbose: true
 
+  # 2. Then run ruff (linter and formatter)
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.12.11
+    rev: v0.14.0
     hooks:
       - id: ruff
-        args: [--fix]
-      - id: ruff-format
+        name: ruff (fix)
+        description: "Fix linting issues"
+        types: [python]
+        args: [--fix, --exit-non-zero-on-fix, --show-fixes]
+        exclude: '/(\.git|\.venv|venv|__pycache__|migrations|node_modules|build|dist)/'
+        verbose: true
 
+      - id: ruff-format
+        name: ruff (format)
+        description: "Format code"
+        types: [python]
+        args: [--force-exclude]
+        exclude: '/(\.git|\.venv|venv|__pycache__|migrations|node_modules|build|dist)/'
+        verbose: true
+
+  # 3. Run mypy for static type checking
   - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: v1.17.1
+    rev: v1.18.2
     hooks:
       - id: mypy
+        name: mypy
+        description: "Static type checking"
         language: python
-        additional_dependencies: [pydantic>=2.11.7]
+        types: [python]
+        additional_dependencies:
+          - pydantic>=2.11.7
+          - types-requests
+          - types-python-dateutil
+          - types-pyyaml
+        args:
+          - --strict
+          - --ignore-missing-imports
+          - --show-error-context
+          - --show-column-numbers
+          - --show-error-end
+          - --no-warn-return-any
+          - --warn-unreachable
+        exclude: '/(\.git|\.venv|venv|__pycache__|migrations|node_modules|build|dist|tests?/|scripts/|examples?/|docs?/)/'
+        require_serial: true
+        verbose: true
+
+  # 4. Finally, handle dependencies
+  - repo: https://github.com/astral-sh/uv-pre-commit
+    rev: 0.8.24
+    hooks:
+      - id: uv-sync
+        name: uv sync
+        description: "Synchronize dependencies"
+        args: ["--locked", "--all-packages"]
+        always_run: true
+        verbose: true
+
+      - id: uv-lock
+        name: uv lock
+        description: "Generate lockfile"
+        always_run: true
+        verbose: true
+
+      - id: uv-export
+        name: uv export
+        description: "Export requirements"
+        args: ["--output", "requirements.txt"] # Explicit output file
+        always_run: true
+        verbose: true
+        # Prevent the hook from failing if the file doesn't exist yet
+        pass_filenames: false
+        # Don't modify files during pre-commit check
+        stages: [manual]
+
+  # 5. Additional useful hooks
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: check-added-large-files
+        args: ["--maxkb=500"]
+      - id: check-merge-conflict
+      - id: check-yaml
+      - id: end-of-file-fixer
+        exclude: '\.(md|rst|txt)$'
+      - id: trailing-whitespace
+        args: [--markdown-linebreak-ext=md]
+      - id: mixed-line-ending
+        args: ["--fix=lf"]
