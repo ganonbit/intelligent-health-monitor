@@ -13,7 +13,7 @@ from functools import lru_cache
 from typing import Any, Literal, cast
 
 from dotenv import load_dotenv
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import BaseModel, Field, model_validator
 
 # Load environment variables from .env file
 load_dotenv()
@@ -22,15 +22,25 @@ load_dotenv()
 class AIProviderConfig(BaseModel):
     """AI provider configuration with secure defaults."""
 
-    openai_api_key: str = Field(..., description="OpenAI API key")
-    anthropic_api_key: str | None = Field(None, description="Anthropic API key (optional)")
+    # API keys for different providers (at least one required)
+    openai_api_key: str | None = Field(None, description="OpenAI API key")
+    anthropic_api_key: str | None = Field(None, description="Anthropic API key")
+    gemini_api_key: str | None = Field(None, description="Google Gemini API key")
 
-    # Model selection for different tasks
+    # Model selection for different tasks (provider-agnostic)
     anomaly_detection_model: str = Field(
-        default="openai:gpt-4o-mini", description="Model to use for anomaly detection"
+        ...,
+        description=(
+            "Model to use for anomaly detection "
+            "(e.g., openai:gpt-4o-mini, anthropic:claude-3-5-sonnet-20241022, gemini-1.5-flash)"
+        ),
     )
     root_cause_model: str = Field(
-        default="openai:gpt-4o", description="Model to use for root cause analysis"
+        ...,
+        description=(
+            "Model to use for root cause analysis "
+            "(e.g., openai:gpt-4o, anthropic:claude-3-5-sonnet-20241022, gemini-1.5-pro)"
+        ),
     )
 
     # AI behavior settings
@@ -47,22 +57,60 @@ class AIProviderConfig(BaseModel):
         default=3, ge=0, description="Default max retries for AI models"
     )
 
-    @field_validator("openai_api_key")
-    def validate_openai_api_key(cls, v: str):
-        if not v or v == "your-openai-api-key-here":
-            raise ValueError("AI provider API key must be set in environment or .env file")
-        if not v.startswith("sk-"):
-            raise ValueError("AI provider API key must start with 'sk-'")
-        return v
+    @model_validator(mode="after")
+    def validate_at_least_one_api_key(self) -> "AIProviderConfig":
+        """Ensure at least one AI provider API key is configured."""
+        if not any([self.openai_api_key, self.anthropic_api_key, self.gemini_api_key]):
+            raise ValueError(
+                "At least one AI provider API key must be set. "
+                "Set OPENAI_AI_API_KEY, ANTHROPIC_AI_API_KEY, or GEMINI_AI_API_KEY "
+                "in environment or .env file"
+            )
+        return self
 
-    @field_validator("anthropic_api_key")
-    def validate_anthropic_api_key(cls, v: str | None):
-        # Optional: allow missing or empty. If provided, validate format.
-        if not v:
+    @model_validator(mode="after")
+    def validate_model_has_api_key(self) -> "AIProviderConfig":
+        """Ensure the selected models have corresponding API keys configured."""
+
+        # Extract provider from model name (format: "provider:model" or just "model")
+        def get_provider(model: str) -> str | None:
+            if ":" in model:
+                return model.split(":")[0].lower()
+            # Infer provider from model name patterns
+            if model.startswith("gpt"):
+                return "openai"
+            elif model.startswith("claude"):
+                return "anthropic"
+            elif model.startswith("gemini"):
+                return "gemini"
             return None
-        if not v.startswith("sk-"):
-            raise ValueError("AI provider API key must start with 'sk-'")
-        return v
+
+        anomaly_provider = get_provider(self.anomaly_detection_model)
+        root_cause_provider = get_provider(self.root_cause_model)
+
+        missing_keys = []
+        if anomaly_provider == "openai" and not self.openai_api_key:
+            missing_keys.append(f"OPENAI_AI_API_KEY (required for {self.anomaly_detection_model})")
+        elif anomaly_provider == "anthropic" and not self.anthropic_api_key:
+            missing_keys.append(
+                f"ANTHROPIC_AI_API_KEY (required for {self.anomaly_detection_model})"
+            )
+        elif anomaly_provider == "gemini" and not self.gemini_api_key:
+            missing_keys.append(f"GEMINI_AI_API_KEY (required for {self.anomaly_detection_model})")
+
+        if root_cause_provider == "openai" and not self.openai_api_key:
+            missing_keys.append(f"OPENAI_AI_API_KEY (required for {self.root_cause_model})")
+        elif root_cause_provider == "anthropic" and not self.anthropic_api_key:
+            missing_keys.append(f"ANTHROPIC_AI_API_KEY (required for {self.root_cause_model})")
+        elif root_cause_provider == "gemini" and not self.gemini_api_key:
+            missing_keys.append(f"GEMINI_AI_API_KEY (required for {self.root_cause_model})")
+
+        if missing_keys:
+            raise ValueError(
+                f"Missing API keys for selected models: {', '.join(set(missing_keys))}"
+            )
+
+        return self
 
 
 class MonitoringConfig(BaseModel):
@@ -188,13 +236,33 @@ def load_config_from_env() -> AppConfig:
     environment = _env_to_literal(os.getenv("ENVIRONMENT", "development"))
     debug = environment == "development"
 
-    # AI Provider config from environment
-    anthropic_env = os.getenv("ANTHROPIC_API_KEY")
+    # AI Provider config from environment (check for all possible API keys)
+    openai_key = os.getenv("OPENAI_AI_API_KEY") or os.getenv("OPENAI_API_KEY")
+    anthropic_key = os.getenv("ANTHROPIC_AI_API_KEY") or os.getenv("ANTHROPIC_API_KEY")
+    gemini_key = os.getenv("GEMINI_AI_API_KEY") or os.getenv("GOOGLE_API_KEY")
+
+    # Require model configuration (no defaults to avoid provider bias)
+    anomaly_model = os.getenv("ANOMALY_MODEL") or os.getenv("ANOMALY_DETECTION_MODEL")
+    root_cause_model = os.getenv("ROOT_CAUSE_MODEL")
+
+    if not anomaly_model:
+        raise ValueError(
+            "ANOMALY_MODEL must be set in environment. "
+            "Examples: 'openai:gpt-4o-mini', 'anthropic:claude-3-5-sonnet-20241022', "
+            "'gemini-1.5-flash'"
+        )
+    if not root_cause_model:
+        raise ValueError(
+            "ROOT_CAUSE_MODEL must be set in environment. "
+            "Examples: 'openai:gpt-4o', 'anthropic:claude-3-5-sonnet-20241022', 'gemini-1.5-pro'"
+        )
+
     ai_config = AIProviderConfig(
-        openai_api_key=os.getenv("OPENAI_API_KEY", ""),
-        anthropic_api_key=anthropic_env if anthropic_env else None,
-        anomaly_detection_model=os.getenv("ANOMALY_DETECTION_MODEL", "openai:gpt-4o-mini"),
-        root_cause_model=os.getenv("ROOT_CAUSE_MODEL", "openai:gpt-4o"),
+        openai_api_key=openai_key,
+        anthropic_api_key=anthropic_key,
+        gemini_api_key=gemini_key,
+        anomaly_detection_model=anomaly_model,
+        root_cause_model=root_cause_model,
     )
 
     # Monitoring config with environment overrides
@@ -250,11 +318,16 @@ def validate_config() -> None:
         print(f"✅ Configuration loaded for {config.environment} environment")
 
         # Test AI provider connection (optional)
+        configured_providers = []
         if config.ai_provider.openai_api_key:
-            print("✅ OpenAI API key configured")
-
+            configured_providers.append("OpenAI")
         if config.ai_provider.anthropic_api_key:
-            print("✅ Anthropic API key configured")
+            configured_providers.append("Anthropic")
+        if config.ai_provider.gemini_api_key:
+            configured_providers.append("Gemini")
+
+        if configured_providers:
+            print(f"✅ AI providers configured: {', '.join(configured_providers)}")
 
     except Exception as e:
         print(f"❌ Configuration validation failed: {e}")
@@ -264,7 +337,7 @@ def validate_config() -> None:
 def reset_config_cache() -> None:
     """Clear the cached application configuration (useful after env var changes)."""
     try:
-        get_config.cache_clear()  # type: ignore[attr-defined]
+        get_config.cache_clear()
     except Exception:
         # If cache_clear is not available, ignore; next call will recompute anyway
         pass
