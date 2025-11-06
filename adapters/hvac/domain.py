@@ -16,11 +16,10 @@ Key HVAC Concepts:
 
 from datetime import UTC, datetime, timedelta
 from enum import Enum
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field, computed_field, validator
 
-# Extend core domain models
 from core.domain.models import Severity
 
 
@@ -96,8 +95,8 @@ class HVACMetric(BaseModel):
     zone_name: str = Field(description="Building zone or area served")
     setpoint: float | None = Field(None, description="Target value for controlled metrics")
 
-    @validator("value")
-    def validate_hvac_ranges(cls, v: float, values: dict) -> float:
+    @validator("value", pre=True, allow_reuse=True)
+    def validate_hvac_ranges(cls, v: float, values: dict[str, Any]) -> float:
         """Validate HVAC metrics are in realistic ranges."""
         metric_type = values.get("metric_type")
 
@@ -486,7 +485,7 @@ if __name__ == "__main__":
         rating = metric.energy_efficiency_rating
         if rating is not None:
             print(f"    Efficiency: {rating}")
-        if metric.is_out_of_range is True:
+        if metric.is_out_of_range():
             print(f"    ⚠️  OUT OF RANGE (setpoint: {metric.setpoint})")
 
     # Create air handler metrics
@@ -502,7 +501,7 @@ if __name__ == "__main__":
     print(f"\n🌬️  AIR HANDLER METRICS ({len(ahu_metrics)} metrics)")
     for metric in ahu_metrics:
         print(f"  {metric.metric_type.value}: {metric.value} {metric.unit}")
-        if metric.is_out_of_range is True:
+        if metric.is_out_of_range():
             print(f"    ⚠️  OUT OF RANGE (setpoint: {metric.setpoint})")
 
     # Test calculations
