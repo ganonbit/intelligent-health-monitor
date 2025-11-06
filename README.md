@@ -95,11 +95,24 @@ These demos do not start any external services; they simulate sources and intera
 
 Configuration is centralized in `core/config.py` and validated at load time.
 
+### AI Provider Configuration (Provider-Agnostic)
+
+**At least one API key is required:**
+
+- `OPENAI_AI_API_KEY` — OpenAI API key (get from <https://platform.openai.com/api-keys>)
+- `ANTHROPIC_AI_API_KEY` — Anthropic API key (get from <https://console.anthropic.com/>)
+- `GEMINI_AI_API_KEY` — Google Gemini API key (get from <https://aistudio.google.com/app/apikey>)
+
+**Model selection (REQUIRED - no defaults):**
+
+- `ANOMALY_MODEL` — Model for anomaly detection
+  - Examples: `openai:gpt-4o-mini`, `anthropic:claude-3-5-sonnet-20241022`, `gemini-1.5-flash`
+- `ROOT_CAUSE_MODEL` — Model for root cause analysis
+  - Examples: `openai:gpt-4o`, `anthropic:claude-3-5-sonnet-20241022`, `gemini-1.5-pro`
+
+**Other configuration:**
+
 - `ENVIRONMENT` — `development | staging | production`
-- `OPENAI_API_KEY` — required for AI analysis demos
-- `ANTHROPIC_API_KEY` — optional, if using Anthropic
-- `ANOMALY_DETECTION_MODEL` — model id string (default: `openai:gpt-4o-mini`)
-- `ROOT_CAUSE_MODEL` — model id string (default: `openai:gpt-4o`)
 - `API_*` — reserved for future API server (CORS origins, port, reload)
 
 Helper functions:
