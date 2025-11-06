@@ -76,8 +76,17 @@ def system_context() -> SystemContext:
 
 
 @pytest.mark.asyncio
-async def test_anomaly_detection_returns_none_on_no_metrics(system_context: SystemContext) -> None:
-    agent = AnomalyDetectionAgent(AIAnalysisConfig())
+async def test_anomaly_detection_returns_none_on_no_metrics(
+    system_context: SystemContext,
+) -> None:
+    config = AIAnalysisConfig(
+        model_name="openai:gpt-4o-mini",
+        temperature=0.1,
+        max_tokens=1000,
+        timeout_seconds=30.0,
+        max_retries=3,
+    )
+    agent = AnomalyDetectionAgent(config)
 
     result = await agent.analyze_metrics([], system_context)
 
@@ -88,12 +97,19 @@ async def test_anomaly_detection_returns_none_on_no_metrics(system_context: Syst
 async def test_anomaly_detection_ignores_low_confidence(
     sample_metrics: list[SystemMetric], system_context: SystemContext
 ) -> None:
-    config = AIAnalysisConfig(anomaly_threshold=0.7)
+    config = AIAnalysisConfig(
+        model_name="openai:gpt-4o-mini",
+        temperature=0.1,
+        max_tokens=1000,
+        timeout_seconds=30.0,
+        max_retries=3,
+        anomaly_threshold=0.7,
+    )
     agent = AnomalyDetectionAgent(config)
 
     low_conf_anomaly = AnomalyDetection(
         severity=Severity.LOW,
-        confidence=0.5,  # below threshold
+        confidence_score=0.5,  # below threshold
         affected_metrics=[MetricType.CPU],
         root_cause_hypothesis="Normal variance",
         recommended_actions=["Monitor"],
@@ -101,11 +117,11 @@ async def test_anomaly_detection_ignores_low_confidence(
         model_reasoning="Test reasoning",
     )
 
-    async def fake_run(*args, **kwargs):
+    async def fake_run(*args: Any, **kwargs: Any) -> _FakeAgentResult:
         return _FakeAgentResult(low_conf_anomaly)
 
     # Patch the underlying pydantic-ai Agent.run
-    agent.agent.run = fake_run  # type: ignore[assignment]
+    agent.agent.run = fake_run
 
     result = await agent.analyze_metrics(sample_metrics, system_context)
 
@@ -116,12 +132,19 @@ async def test_anomaly_detection_ignores_low_confidence(
 async def test_anomaly_detection_returns_high_confidence_anomaly(
     sample_metrics: list[SystemMetric], system_context: SystemContext
 ) -> None:
-    config = AIAnalysisConfig(anomaly_threshold=0.7)
+    config = AIAnalysisConfig(
+        model_name="openai:gpt-4o-mini",
+        temperature=0.1,
+        max_tokens=1000,
+        timeout_seconds=30.0,
+        max_retries=3,
+        anomaly_threshold=0.7,
+    )
     agent = AnomalyDetectionAgent(config)
 
     high_conf_anomaly = AnomalyDetection(
         severity=Severity.HIGH,
-        confidence=0.92,  # above threshold
+        confidence_score=0.92,  # above threshold
         affected_metrics=[MetricType.CPU, MetricType.ERROR_RATE],
         root_cause_hypothesis="CPU saturation correlates with error rate",
         recommended_actions=["Scale out", "Investigate deployment"],
@@ -129,32 +152,40 @@ async def test_anomaly_detection_returns_high_confidence_anomaly(
         model_reasoning="Correlated spikes detected",
     )
 
-    async def fake_run(*args, **kwargs):
+    async def fake_run(*args: Any, **kwargs: Any) -> _FakeAgentResult:
         return _FakeAgentResult(high_conf_anomaly)
 
-    agent.agent.run = fake_run  # type: ignore[assignment]
+    agent.agent.run = fake_run
 
     result = await agent.analyze_metrics(sample_metrics, system_context)
 
     assert isinstance(result, AnomalyDetection)
     assert result.severity == Severity.HIGH
-    assert result.confidence == pytest.approx(0.92, rel=1e-6)
+    assert result.confidence_score == pytest.approx(0.92, rel=1e-6)
     assert MetricType.CPU in result.affected_metrics
 
 
 @pytest.mark.asyncio
-async def test_root_cause_analysis_returns_text(system_context: SystemContext) -> None:
-    rca = RootCauseAnalysisAgent(AIAnalysisConfig())
+async def test_root_cause_analysis_returns_text(
+    system_context: SystemContext,
+) -> None:
+    config = AIAnalysisConfig(
+        model_name="openai:gpt-4o-mini",
+        temperature=0.1,
+        max_tokens=1000,
+        timeout_seconds=30.0,
+        max_retries=3,
+    )
+    rca = RootCauseAnalysisAgent(config)
 
-    async def fake_run(prompt: str, *args, **kwargs):
-        assert "ANOMALY DETECTED" in prompt
+    async def fake_run(*args: Any, **kwargs: Any) -> _FakeAgentResult:
         return _FakeAgentResult("ROOT CAUSE HYPOTHESIS: example")
 
-    rca.agent.run = fake_run  # type: ignore[assignment]
+    rca.agent.run = fake_run
 
     anomaly = AnomalyDetection(
         severity=Severity.MEDIUM,
-        confidence=0.8,
+        confidence_score=0.8,
         affected_metrics=[MetricType.CPU],
         root_cause_hypothesis="Hypothesis",
         recommended_actions=["Action"],
@@ -171,28 +202,37 @@ async def test_root_cause_analysis_returns_text(system_context: SystemContext) -
 async def test_intelligent_monitoring_service_orchestrates_and_sets_status(
     sample_metrics: list[SystemMetric], system_context: SystemContext
 ) -> None:
-    service = IntelligentMonitoringService(AIAnalysisConfig())
+    config = AIAnalysisConfig(
+        model_name="openai:gpt-4o-mini",
+        temperature=0.1,
+        max_tokens=1000,
+        timeout_seconds=30.0,
+        max_retries=3,
+    )
+    service = IntelligentMonitoringService(config)
 
     # Patch anomaly detection to return a high severity anomaly
-    async def fake_detect(metrics, context):  # type: ignore[no-untyped-def]
-        return AnomalyDetection(
-            severity=Severity.HIGH,
-            confidence=0.9,
-            affected_metrics=[MetricType.CPU],
-            root_cause_hypothesis="Hypothesis",
-            recommended_actions=["Action"],
-            correlation_window_minutes=10,
-            model_reasoning="Reasoning",
+    async def fake_detect(*args: Any, **kwargs: Any) -> _FakeAgentResult:
+        return _FakeAgentResult(
+            AnomalyDetection(
+                severity=Severity.HIGH,
+                confidence_score=0.9,
+                affected_metrics=[MetricType.CPU],
+                root_cause_hypothesis="Hypothesis",
+                recommended_actions=["Action"],
+                correlation_window_minutes=10,
+                model_reasoning="Reasoning",
+            )
         )
 
-    service.anomaly_detection_agent.analyze_metrics = fake_detect  # type: ignore[assignment]
+    service.anomaly_detection_agent.agent.run = fake_detect
 
     # Patch RCA to avoid real LLM call
-    async def fake_rca(anomaly, metrics, context):  # type: ignore[no-untyped-def]
+    async def fake_rca(*args: Any, **kwargs: Any) -> _FakeAgentResult:
         await asyncio.sleep(0)  # ensure it's truly async
-        return "analysis text"
+        return _FakeAgentResult("analysis text")
 
-    service.root_cause_analysis_agent.analyze_root_cause = fake_rca  # type: ignore[assignment]
+    service.root_cause_analysis_agent.agent.run = fake_rca
 
     report = await service.analyze_system_health(sample_metrics, system_context)
 

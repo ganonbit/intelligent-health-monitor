@@ -399,7 +399,7 @@ def sample_anomaly() -> AnomalyDetection:
     """Generate realistic anomaly detection result."""
     return AnomalyDetection(
         severity=Severity.HIGH,
-        confidence=0.87,
+        confidence_score=0.87,
         affected_metrics=[MetricType.CPU, MetricType.ERROR_RATE],
         root_cause_hypothesis=(
             "High CPU usage correlates with increased error rate, suggesting "
@@ -440,23 +440,23 @@ class TestDomainModels:
 
     def test_anomaly_detection_confidence_bounds(self) -> None:
         """Test that confidence is properly bounded."""
-        # Valid confidence
+        # Valid confidence_score
         anomaly = AnomalyDetection(
             severity=Severity.LOW,
-            confidence=0.75,
+            confidence_score=0.75,
             affected_metrics=[MetricType.CPU],
             root_cause_hypothesis="Test hypothesis",
             recommended_actions=["Test action"],
             correlation_window_minutes=10,
             model_reasoning="Test reasoning",
         )
-        assert anomaly.confidence == 0.75
+        assert anomaly.confidence_score == 0.75
 
-        # Invalid confidence should be rejected
+        # Invalid confidence_score should be rejected
         with pytest.raises(ValueError):
             AnomalyDetection(
                 severity=Severity.LOW,
-                confidence=1.5,  # > 1.0, should fail
+                confidence_score=1.5,  # > 1.0, should fail
                 affected_metrics=[MetricType.CPU],
                 root_cause_hypothesis="Test",
                 recommended_actions=["Test"],

@@ -34,20 +34,23 @@ from core.config import (
 def clear_config_cache() -> Iterator[None]:
     """Ensure get_config cache is cleared before and after each test."""
     try:
-        get_config.cache_clear()  # type: ignore[attr-defined]
+        get_config.cache_clear()
     except Exception:
+        # If cache_clear is not available, ignore; next call will recompute anyway
         pass
     yield
     try:
-        get_config.cache_clear()  # type: ignore[attr-defined]
+        get_config.cache_clear()
     except Exception:
+        # If cache_clear is not available, ignore; next call will recompute anyway
         pass
 
 
 def _set_minimal_valid_env(monkeypatch: pytest.MonkeyPatch) -> None:
     """Set the minimal environment required for config to validate."""
-    monkeypatch.setenv("OPENAI_API_KEY", "sk-test-openai")
-    monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-test-anthropic")
+    monkeypatch.setenv("OPENAI_AI_API_KEY", "sk-test-openai")
+    monkeypatch.setenv("ANOMALY_MODEL", "openai:gpt-4o-mini")
+    monkeypatch.setenv("ROOT_CAUSE_MODEL", "openai:gpt-4o")
 
 
 def test_load_config_dev_defaults(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -141,8 +144,8 @@ def test_app_config_debug_only_in_dev_validation() -> None:
     logging_cfg = LoggingConfig()
     ai = AIProviderConfig(
         openai_api_key="sk-test-openai",
-        anthropic_api_key="sk-test-anthropic",
         anomaly_detection_model="openai:gpt-4o-mini",
+        root_cause_model="openai:gpt-4o",
     )
     monitoring = MonitoringConfig()
     database = DatabaseConfig()

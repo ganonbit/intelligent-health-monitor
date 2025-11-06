@@ -23,6 +23,7 @@ from core.config import get_config, print_config_summary, validate_config
 from core.domain.models import MetricType, SystemMetric
 from core.services.ai_analysis import SystemContext
 from core.services.integrated_monitoring import IntegratedMonitoringService
+from core.services.metrics_collector import Result
 
 console = Console()
 
@@ -34,10 +35,8 @@ class TestMetricsSource:
         self.source_name = source_name
         self.scenario = scenario
 
-    async def collect_metrics(self):
+    async def collect_metrics(self) -> Result[list[SystemMetric], Exception]:
         """Generate test metrics based on scenario."""
-        from core.services.metrics_collector import Result
-
         try:
             await asyncio.sleep(0.1)  # Simulate collection time
 
@@ -137,15 +136,32 @@ async def test_configuration() -> bool:
         validate_config()
         config = get_config()
 
-        # Check required values
-        if (
-            not config.ai_provider.openai_api_key
-            or config.ai_provider.openai_api_key == "your-openai-api-key-here"
-        ):
+        # Check that at least one AI provider is configured
+        has_provider = any(
+            [
+                config.ai_provider.openai_api_key,
+                config.ai_provider.anthropic_api_key,
+                config.ai_provider.gemini_api_key,
+            ]
+        )
+
+        if not has_provider:
             console.print(
-                "❌ OpenAI API key not configured. Please set OPENAI_API_KEY in .env", style="red"
+                "❌ No AI provider API key configured. Please set at least one in .env:",
+                style="red",
             )
-            console.print("Get your key from: https://platform.openai.com/api-keys", style="yellow")
+            console.print(
+                "  - OPENAI_AI_API_KEY (from https://platform.openai.com/api-keys)",
+                style="yellow",
+            )
+            console.print(
+                "  - ANTHROPIC_AI_API_KEY (from https://console.anthropic.com/)",
+                style="yellow",
+            )
+            console.print(
+                "  - GEMINI_AI_API_KEY (from https://aistudio.google.com/app/apikey)",
+                style="yellow",
+            )
             return False
 
         console.print("✅ Configuration loaded successfully", style="green")
@@ -221,7 +237,9 @@ async def test_ai_analysis() -> bool:
         )
 
         # Create AI service
+        app_config = get_config()
         config = AIAnalysisConfig(
+            model_name=app_config.ai_provider.anomaly_detection_model,
             anomaly_threshold=0.6,  # Lower threshold for testing
             timeout_seconds=30.0,
         )
@@ -284,7 +302,7 @@ async def test_ai_analysis() -> bool:
             for i, anomaly in enumerate(health_report.anomalies, 1):
                 console.print(f"\n🚨 Anomaly #{i}:", style="red")
                 console.print(f"  Severity: {anomaly.severity.value.upper()}")
-                console.print(f"  Confidence: {anomaly.confidence:.1%}")
+                console.print(f"  Confidence Score: {anomaly.confidence_score:.1%}")
                 console.print(f"  Affected: {', '.join(m.value for m in anomaly.affected_metrics)}")
                 console.print(f"  Hypothesis: {anomaly.root_cause_hypothesis}")
                 console.print(
@@ -298,7 +316,14 @@ async def test_ai_analysis() -> bool:
     except Exception as e:
         console.print(f"❌ AI analysis test failed: {e}", style="red")
         if "api key" in str(e).lower():
-            console.print("💡 Make sure OPENAI_API_KEY is set in your .env file", style="yellow")
+            console.print(
+                "💡 Make sure your AI provider API key is set in .env file",
+                style="yellow",
+            )
+            console.print(
+                "   (OPENAI_AI_API_KEY, ANTHROPIC_AI_API_KEY, or GEMINI_AI_API_KEY)",
+                style="yellow",
+            )
         return False
 
 
@@ -374,8 +399,13 @@ async def test_error_handling() -> bool:
 
     try:
         # Test with invalid API key to trigger fallback
-        original_key = os.getenv("OPENAI_API_KEY")
-        os.environ["OPENAI_API_KEY"] = "invalid-key-for-testing"
+        original_openai = os.getenv("OPENAI_AI_API_KEY")
+        original_anthropic = os.getenv("ANTHROPIC_AI_API_KEY")
+        original_gemini = os.getenv("GEMINI_AI_API_KEY")
+
+        os.environ["OPENAI_AI_API_KEY"] = "invalid-key-for-testing"
+        os.environ["ANTHROPIC_AI_API_KEY"] = "invalid-key-for-testing"
+        os.environ["GEMINI_AI_API_KEY"] = "invalid-key-for-testing"
 
         # Create service with invalid config
         monitoring_service = IntegratedMonitoringService()
@@ -395,9 +425,13 @@ async def test_error_handling() -> bool:
         console.print("🔄 Testing fallback behavior...", style="yellow")
         health_report = await monitoring_service.run_monitoring_cycle()
 
-        # Restore original key
-        if original_key:
-            os.environ["OPENAI_API_KEY"] = original_key
+        # Restore original keys
+        if original_openai:
+            os.environ["OPENAI_AI_API_KEY"] = original_openai
+        if original_anthropic:
+            os.environ["ANTHROPIC_AI_API_KEY"] = original_anthropic
+        if original_gemini:
+            os.environ["GEMINI_AI_API_KEY"] = original_gemini
         from core.config import reset_config_cache
 
         reset_config_cache()
@@ -411,9 +445,13 @@ async def test_error_handling() -> bool:
             return False
 
     except Exception as e:
-        # Restore original key on error
-        if original_key:
-            os.environ["OPENAI_API_KEY"] = original_key
+        # Restore original keys on error
+        if original_openai:
+            os.environ["OPENAI_AI_API_KEY"] = original_openai
+        if original_anthropic:
+            os.environ["ANTHROPIC_AI_API_KEY"] = original_anthropic
+        if original_gemini:
+            os.environ["GEMINI_AI_API_KEY"] = original_gemini
         from core.config import reset_config_cache
 
         reset_config_cache()
