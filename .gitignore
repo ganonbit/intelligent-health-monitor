@@ -58,3 +58,6 @@ Thumbs.db
 /business/
 /proprietary/
 /customer-configs/
+
+# Snyk Security Extension - AI Rules (auto-generated)
+.cursor/rules/snyk_rules.mdc
