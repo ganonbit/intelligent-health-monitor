@@ -120,7 +120,7 @@ class AlertManager:
                 "alert_generated",
                 severity=anomaly.severity.value,
                 system=system_context.system_name,
-                confidence=anomaly.confidence,
+                confidence=anomaly.confidence_score,
             )
 
         # Generate system health summary alerts for critical status
@@ -176,7 +176,7 @@ class AlertManager:
         print(f"Description: {alert.description}")
 
         if alert.anomaly:
-            print(f"Confidence: {alert.anomaly.confidence:.1%}")
+            print(f"Confidence: {alert.anomaly.confidence_score:.1%}")
             print(f"Affected Metrics: {', '.join(m.value for m in alert.anomaly.affected_metrics)}")
             print("Recommended Actions:")
             for action in alert.anomaly.recommended_actions:

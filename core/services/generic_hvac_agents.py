@@ -28,12 +28,19 @@ logger = structlog.get_logger()
 
 
 class EnergyOptimizationSuggestion(BaseModel):
-    """Generic energy optimization recommendations."""
+    """Generic energy optimization recommendations with verbal confidence pattern."""
 
     # Overall assessment
     current_efficiency_level: str = Field(description="Current system efficiency rating")
     improvement_potential: str = Field(description="Low/Medium/High improvement potential")
-    confidence: float = Field(ge=0.0, le=1.0, description="Analysis confidence")
+    confidence_score: float = Field(
+        ge=0.0,
+        le=1.0,
+        description=(
+            "Self-assessed confidence (0.0-1.0). Consider data completeness, "
+            "measurement quality, baseline availability, and analysis certainty."
+        ),
+    )
 
     # Specific recommendations (generic patterns)
     setpoint_adjustments: list[str] = Field(description="Suggested setpoint modifications")
@@ -77,12 +84,19 @@ class ComfortAssessmentResult(BaseModel):
 
 
 class FaultDetectionResult(BaseModel):
-    """Generic fault detection and diagnostics."""
+    """Generic fault detection and diagnostics with verbal confidence pattern."""
 
     # Fault analysis
     faults_detected: list[str] = Field(description="Potential equipment faults identified")
     fault_severity: str = Field(description="Overall fault severity: Low/Medium/High/Critical")
-    confidence_level: float = Field(ge=0.0, le=1.0, description="Confidence in fault detection")
+    confidence_score: float = Field(
+        ge=0.0,
+        le=1.0,
+        description=(
+            "Self-assessed confidence (0.0-1.0). Consider fault pattern clarity, "
+            "data quality, historical context, and diagnostic certainty."
+        ),
+    )
 
     # Diagnostic insights
     performance_degradation_indicators: list[str] = Field(
@@ -145,6 +159,20 @@ Avoid:
 - Detailed equipment-specific tuning parameters
 - Advanced control sequences requiring specialized knowledge
 
+CRITICAL - Confidence Score Assessment (Verbal Confidence Pattern):
+You MUST self-assess your confidence and populate the confidence_score field (0.0-1.0).
+Consider these factors:
+- Data Completeness: Do you have sufficient metrics for analysis?
+- Measurement Quality: Are the readings consistent and reliable?
+- Baseline Availability: Do you have baseline data to compare against?
+- Analysis Certainty: How clear are the optimization opportunities?
+
+Confidence Guidelines:
+- 0.9-1.0: Very high confidence - complete data, clear patterns, strong recommendations
+- 0.7-0.9: High confidence - good data, solid analysis, reliable recommendations
+- 0.5-0.7: Moderate confidence - adequate data, reasonable analysis, cautious recommendations
+- Below 0.5: Low confidence - limited data, uncertain analysis, general recommendations
+
 Provide practical, implementable recommendations that demonstrate
 understanding of HVAC systems without revealing competitive advantages."""
 
@@ -166,7 +194,7 @@ understanding of HVAC systems without revealing competitive advantages."""
             self.logger.info(
                 "energy_optimization_analysis_completed",
                 improvement_potential=result.data.improvement_potential,
-                confidence=result.data.confidence,
+                confidence_score=result.data.confidence_score,
             )
 
             return result.data
@@ -178,7 +206,7 @@ understanding of HVAC systems without revealing competitive advantages."""
             return EnergyOptimizationSuggestion(
                 current_efficiency_level="Unable to determine",
                 improvement_potential="Unknown",
-                confidence=0.1,
+                confidence_score=0.1,
                 setpoint_adjustments=["Verify all setpoints are within design ranges"],
                 scheduling_optimizations=[
                     "Review operating schedules for optimization opportunities"
@@ -588,6 +616,20 @@ Focus on:
 - Performance trend analysis
 - Basic troubleshooting guidance
 
+CRITICAL - Confidence Score Assessment (Verbal Confidence Pattern):
+You MUST self-assess your confidence and populate the confidence_score field (0.0-1.0).
+Consider these factors:
+- Fault Pattern Clarity: How clear and unambiguous are the fault indicators?
+- Data Quality: Are measurements consistent and reliable?
+- Historical Context: Do you have baseline or historical data for comparison?
+- Diagnostic Certainty: How confident are you in the fault diagnosis?
+
+Confidence Guidelines:
+- 0.9-1.0: Very high confidence - clear fault patterns, strong evidence, definitive diagnosis
+- 0.7-0.9: High confidence - solid indicators, good data, reliable diagnosis
+- 0.5-0.7: Moderate confidence - some indicators, adequate data, probable diagnosis
+- Below 0.5: Low confidence - weak indicators, limited data, uncertain diagnosis
+
 Provide educational insights about HVAC fault detection and practical
 recommendations that any qualified technician could follow."""
 
@@ -610,7 +652,7 @@ recommendations that any qualified technician could follow."""
                 "fault_detection_completed",
                 faults_detected=len(result.data.faults_detected),
                 severity=result.data.fault_severity,
-                confidence=result.data.confidence_level,
+                confidence_score=result.data.confidence_score,
             )
 
             return result.data
@@ -622,7 +664,7 @@ recommendations that any qualified technician could follow."""
             return FaultDetectionResult(
                 faults_detected=["Unable to complete fault analysis"],
                 fault_severity="Unknown",
-                confidence_level=0.1,
+                confidence_score=0.1,
                 performance_degradation_indicators=[
                     "Analysis incomplete - check system data collection"
                 ],
@@ -666,7 +708,7 @@ recommendations that any qualified technician could follow."""
 
             for metric in equip_metrics:
                 # Check for out-of-range conditions
-                if metric.is_out_of_range is True:
+                if metric.is_out_of_range():
                     part1 = (
                         f"{equipment_id}: {metric.metric_type.value} = "
                         f"{metric.value} {metric.unit} "
@@ -1079,7 +1121,7 @@ async def main() -> None:
             print("\n⚡ ENERGY OPTIMIZATION")
             print(f"   Current Efficiency: {energy.current_efficiency_level}")
             print(f"   Improvement Potential: {energy.improvement_potential}")
-            print(f"   Confidence: {energy.confidence:.1%}")
+            print(f"   Confidence Score: {energy.confidence_score:.1%} (self-assessed)")
             print("   Key Recommendations:")
             for rec in energy.immediate_actions[:2]:
                 print(f"     • {rec}")
@@ -1101,7 +1143,7 @@ async def main() -> None:
             print("\n🔧 FAULT DETECTION")
             print(f"   Faults Detected: {len(faults.faults_detected)}")
             print(f"   Severity: {faults.fault_severity}")
-            print(f"   Confidence: {faults.confidence_level:.1%}")
+            print(f"   Confidence Score: {faults.confidence_score:.1%} (self-assessed)")
             if faults.faults_detected:
                 print(f"   Primary Fault: {faults.faults_detected[0]}")
 

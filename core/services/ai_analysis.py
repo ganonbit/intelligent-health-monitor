@@ -1,17 +1,23 @@
 """
-AI-powered system analysis using Pydantic AI.
+AI-powered system analysis using Pydantic AI with model-agnostic architecture.
 
 Key architectural decisions:
 - Multi-agent system: Different agents for different analysis types
 - Type-safe AI responses: All AI output validated with Pydantic
 - Context-aware analysis: Agents understand system topology and history
 - Fallback strategies: Graceful degradation when AI services fail
+- Verbal Confidence Pattern: LLMs self-assess certainty (provider-agnostic)
 
-Why Pydantic AI over alternatives:
-- Type safety: AI responses are validated, not just strings
-- Composability: Agents can call other agents for complex analysis
-- Debugging: Full visibility into AI decision-making process
-- Production-ready: Built-in retries, timeouts, error handling
+Model-Agnostic Design:
+- Works with any provider supported by pydantic-ai (OpenAI, Anthropic, Google, etc.)
+- Switch providers by changing model_name in configuration
+- No provider-specific code in business logic
+- Confidence scores use verbal self-assessment (not API-specific features)
+
+Dependencies:
+- pydantic-ai-slim[provider] where provider is: openai, anthropic, google, etc.
+- Example: pydantic-ai-slim[google] for Gemini models
+- Switch by installing different provider extras as needed
 """
 
 import asyncio
@@ -59,24 +65,42 @@ class SystemContext(BaseModel):
 
 
 class AIAnalysisConfig(BaseModel):
-    """Configuration for AI analysis with smart defaults."""
+    """Configuration for AI analysis with provider-agnostic defaults.
 
-    # Use explicit string to satisfy Agent model literal type requirements
-    model_name: str = "openai:gpt-4o-mini"
+    Model Name Format:
+    - OpenAI: "openai:gpt-4o-mini", "openai:gpt-4o"
+    - Anthropic: "anthropic:claude-3-5-sonnet-20241022", "anthropic:claude-3-5-haiku-20241022"
+    - Google Gemini: "gemini-2.5-flash-lite", "gemini-2.5-pro"
+
+    To switch providers:
+    1. Install the appropriate pydantic-ai-slim extra (e.g., [google], [openai], [anthropic])
+    2. Set the corresponding API key environment variable
+    3. Update model_name to use the new provider's model
+
+    No code changes needed - the system is fully model-agnostic!
+    """
+
+    # Model name (provider-agnostic)
+    model_name: str
     max_tokens: int = Field(default=1000, gt=100)
     temperature: float = Field(default=0.1, ge=0.0, le=1.0)  # Low for consistent analysis
     timeout_seconds: float = Field(default=30.0, gt=0.0)
-    max_retries: int = Field(default=3, ge=0)
+    max_retries: int = Field(default=3, ge=0, description="Auto-retry on validation failures")
 
     # Analysis-specific configuration
     correlation_window_minutes: int = Field(default=30, gt=0)
-    anomaly_threshold: float = Field(default=0.7, ge=0.0, le=1.0)
+    anomaly_threshold: float = Field(
+        default=0.7,
+        ge=0.0,
+        le=1.0,
+        description="Minimum confidence_score threshold for reporting anomalies",
+    )
     required_multiple_metrics: bool = Field(
         default=True, description="Require multiple metrics to confirm anomalies"
     )
 
 
-class AnomalyDetectionAgent(Agent[AnomalyDetection]):
+class AnomalyDetectionAgent:
     """
     AI agent specialized in detecting system anomalies.
 
@@ -92,14 +116,14 @@ class AnomalyDetectionAgent(Agent[AnomalyDetection]):
         self.logger = logger.bind(component="anomaly_detection_agent")
 
         # Initialize the agent with structured output
-        self.agent = Agent(
+        self.agent: Agent[AnomalyDetection] = Agent(
             model=self.config.model_name,
             output_type=AnomalyDetection,
             system_prompt=self._build_system_prompt(),
         )
 
     def _build_system_prompt(self) -> str:
-        """Build system prompt that creates an expert SRE personality."""
+        """Build system prompt with verbal confidence pattern instructions."""
         return f"""You are a Senior Site Reliability Engineer with 15 years of experience
 analyzing system metrics and identifying anomalies before they cause outages.
 
@@ -119,7 +143,23 @@ Severity levels:
 - HIGH: Major deviation, investigate immediately
 - CRITICAL: System likely failing, immediate action required
 
-Always explain your reasoning step-by-step so other engineers can understand your analysis."""
+CRITICAL - Confidence Score Assessment (Verbal Confidence Pattern):
+You MUST self-assess your confidence and populate the confidence_score field (0.0-1.0).
+Consider these factors when determining your confidence:
+- Data Quality: Is there sufficient data? Are there gaps or inconsistencies?
+- Pattern Clarity: Are the anomalous patterns clear and unambiguous?
+- Correlation Strength: Do multiple metrics support the same conclusion?
+- Historical Context: Do you have baseline data to compare against?
+- Analysis Completeness: Do you have all the information needed?
+
+Confidence Guidelines:
+- 0.9-1.0: Very high confidence - clear patterns, strong correlations, good data
+- 0.7-0.9: High confidence - solid evidence, minor uncertainties
+- 0.5-0.7: Moderate confidence - some evidence, notable uncertainties
+- Below 0.5: Low confidence - weak evidence, significant data gaps
+
+Always explain your reasoning step-by-step in the model_reasoning field, including
+WHY you assigned this specific confidence level."""
 
     async def analyze_metrics(
         self, metrics: list[SystemMetric], context: SystemContext
@@ -162,13 +202,14 @@ Always explain your reasoning step-by-step so other engineers can understand you
                 )
                 raise AttributeError(msg)
 
-            # Validate AI response meets our confidence threshold
+            # Validate AI response meets our confidence threshold (verbal confidence pattern)
             anomaly = cast(AnomalyDetection, cast(Any, parsed))
-            if anomaly.confidence < self.config.anomaly_threshold:
+            if anomaly.confidence_score < self.config.anomaly_threshold:
                 self.logger.info(
                     "low_confidence_anomaly_ignored",
-                    confidence=anomaly.confidence,
+                    confidence_score=anomaly.confidence_score,
                     threshold=self.config.anomaly_threshold,
+                    reason="LLM self-assessed confidence below threshold",
                 )
                 return None
 
@@ -177,7 +218,7 @@ Always explain your reasoning step-by-step so other engineers can understand you
             self.logger.info(
                 "anomaly_detected",
                 severity=anomaly.severity,
-                confidence=anomaly.confidence,
+                confidence_score=anomaly.confidence_score,
                 affected_metrics=anomaly.affected_metrics,
                 duration_seconds=round(analysis_duration, 3),
             )
@@ -297,7 +338,15 @@ Please analyze for anomalies considering:
 3. Given the system type and context, is this behavior problematic?
 4. What might be the root cause if there is an issue?
 
-Only report anomalies you're confident about (>{self.config.anomaly_threshold * 100}% sure)."""
+Only report anomalies you're confident about (>{self.config.anomaly_threshold * 100}% sure).
+
+IMPORTANT: You must self-assess your confidence_score (0.0-1.0) based on:
+- How clear and unambiguous the anomaly patterns are
+- The quality and completeness of the available data
+- The strength of correlations between affected metrics
+- Your certainty about the root cause hypothesis
+
+Explain in model_reasoning WHY you assigned this confidence level."""
 
 
 class RootCauseAnalysisAgent:
@@ -345,7 +394,7 @@ say "check application logs for OutOfMemoryError exceptions in the last 30 minut
 
         prompt = f"""ANOMALY DETECTED:
 Severity: {anomaly.severity}
-Confidence: {anomaly.confidence:.2%}
+Confidence Score: {anomaly.confidence_score:.2%} (self-assessed by detection model)
 Affected Metrics: {", ".join(m.value for m in anomaly.affected_metrics)}
 Initial Hypothesis: {anomaly.root_cause_hypothesis}
 
@@ -528,11 +577,16 @@ class IntelligentMonitoringService:
 async def main() -> None:
     """Demonstrate AI analysis of system health."""
 
-    # Configuration
+    # Configuration (model-agnostic - works with any provider)
+    # Examples:
+    # - OpenAI: "openai:gpt-4o-mini"
+    # - Anthropic: "anthropic:claude-3-5-sonnet-20241022"
+    # - Google: "gemini-2.5-flash-lite"
     config = AIAnalysisConfig(
-        model_name="openai:gpt-4o-mini",  # Cost effective for development
+        model_name="openai:gpt-4o-mini",  # Change this to switch providers
         temperature=0.1,  # Conservative for critical analysis
-        anomaly_threshold=0.75,  # High confidence for critical analysis
+        anomaly_threshold=0.75,  # Minimum confidence_score threshold
+        max_retries=3,  # Auto-retry on validation failures
     )
 
     # System context (in production this comes from configuration/discovery)
@@ -597,7 +651,7 @@ async def main() -> None:
         for i, anomaly in enumerate(health_report.anomalies, 1):
             print(f"\n🚨 ANOMALY #{i}")
             print(f"Severity: {anomaly.severity}")
-            print(f"Confidence: {anomaly.confidence:.1%}")
+            print(f"Confidence Score: {anomaly.confidence_score:.1%} (self-assessed)")
             print(f"Affected Metrics: {', '.join(m.value for m in anomaly.affected_metrics)}")
             print(f"Root Cause Hypothesis: {anomaly.root_cause_hypothesis}")
             print(f"Recommended Actions: {', '.join(anomaly.recommended_actions)}")
