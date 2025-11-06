@@ -57,6 +57,7 @@ repos:
           - --show-error-end
           - --no-warn-return-any
           - --warn-unreachable
+          - --no-incremental
         exclude: '/(\.git|\.venv|venv|__pycache__|migrations|node_modules|build|dist|tests?/|scripts/|examples?/|docs?/)/'
         require_serial: true
         verbose: true
