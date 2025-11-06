@@ -815,7 +815,7 @@ class AIValidationFramework:
                     {
                         "efficiency": energy.current_efficiency_level.lower(),
                         "potential": energy.improvement_potential.lower(),
-                        "confidence": energy.confidence,
+                        "confidence_score": energy.confidence_score,
                     }
                 )
 
@@ -825,7 +825,7 @@ class AIValidationFramework:
             potential_consistency = len({a["potential"] for a in energy_assessments}) == 1
 
             # Check confidence variation
-            confidences = [cast(float, a["confidence"]) for a in energy_assessments]
+            confidences = [cast(float, a["confidence_score"]) for a in energy_assessments]
             confidence_std = statistics.stdev(confidences) if len(confidences) > 1 else 0
             confidence_consistency = confidence_std < 0.1  # Less than 10% variation
 
