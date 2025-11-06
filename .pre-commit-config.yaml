@@ -32,7 +32,6 @@ repos:
         name: ruff (format)
         description: "Format code"
         types: [python]
-        args: [--force-exclude]
         exclude: '/(\.git|\.venv|venv|__pycache__|migrations|node_modules|build|dist)/'
         verbose: true
 
