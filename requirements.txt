@@ -199,7 +199,7 @@ typing-inspection==0.4.1
     #   pydantic
     #   pydantic-ai-slim
     #   pydantic-graph
-urllib3==2.5.0
+urllib3==2.6.3
     # via requests
 uvicorn==0.35.0
     # via intelligent-health-monitor (pyproject.toml)
