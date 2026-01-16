@@ -117,7 +117,7 @@ protobuf==6.32.0
     #   googleapis-common-protos
     #   logfire
     #   opentelemetry-proto
-pyasn1==0.6.1
+pyasn1==0.6.2
     # via
     #   pyasn1-modules
     #   rsa
