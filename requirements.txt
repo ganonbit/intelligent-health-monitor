@@ -112,7 +112,7 @@ opentelemetry-semantic-conventions==0.57b0
     #   opentelemetry-sdk
 packaging==25.0
     # via opentelemetry-instrumentation
-protobuf==6.32.0
+protobuf==6.33.5
     # via
     #   googleapis-common-protos
     #   logfire
