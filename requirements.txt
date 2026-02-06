@@ -134,7 +134,7 @@ pydantic==2.11.7
     #   pydantic-ai-slim
     #   pydantic-evals
     #   pydantic-graph
-pydantic-ai-slim==0.8.1
+pydantic-ai-slim==1.56.0
     # via
     #   intelligent-health-monitor (pyproject.toml)
     #   pydantic-evals
